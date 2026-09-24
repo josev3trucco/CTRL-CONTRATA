@@ -89,6 +89,43 @@ def fetch_contracts(
     )
 
 
+def _escape_soql_string(value: str) -> str:
+    """Escapa comillas simples para usar `value` dentro de un literal SoQL ('...')."""
+    return value.replace("'", "''")
+
+
+def fetch_active_contracts(
+    limit: int = 10,
+    entity_name: str | None = None,
+    order: str | None = None,
+    offset: int = 0,
+    timeout: int = 30,
+) -> FetchResult:
+    """Contratos activos (contrato de interfaz §A7): `estado_contrato` es
+    exactamente "En ejecución" y `fecha_de_fin_del_contrato` es hoy o futura.
+
+    "Hoy" se calcula en el momento de la llamada, nunca una fecha fija.
+    `entity_name`, si se pasa, agrega `nombre_entidad = '...'` al mismo
+    `$where` con AND.
+    """
+    today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%dT00:00:00.000")
+    clauses = [
+        f"estado_contrato = '{_escape_soql_string('En ejecución')}'",
+        f"fecha_de_fin_del_contrato >= '{today_utc}'",
+    ]
+    if entity_name:
+        clauses.append(f"nombre_entidad = '{_escape_soql_string(entity_name)}'")
+
+    return fetch_contracts(
+        limit=limit,
+        where=" AND ".join(clauses),
+        order=order,
+        offset=offset,
+        select=SELECTED_COLUMNS,
+        timeout=timeout,
+    )
+
+
 def fetch_contracts_selected(
     limit: int = 10,
     where: str | None = None,
